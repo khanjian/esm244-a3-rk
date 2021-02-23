@@ -1,0 +1,215 @@
+---
+title: "Text Wrangling"
+subtitle: "ESM 244"
+author: "Roupen Khanjian"
+date: "Winter 2021"
+output: 
+  html_document:
+    theme: darkly
+    code_folding: hide
+    toc: TRUE 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(tidytext)
+library(textdata)
+library(ggwordcloud)
+library(glue)
+library(here)
+library(janitor)
+library(tvthemes)
+library(ggimage)
+library(ggpubr)
+library(patchwork)
+
+```
+
+## Data Introduction {.tabset}
+
+```{r}
+
+# source = https://www.kaggle.com/heheheluke/parks-and-recreation-scripts?select=scripts
+
+file_names <- list.files(here("scripts"))
+
+parks <- str_glue("scripts/{file_names}") %>% 
+  map_dfr(read_csv)
+
+season_1 <- str_glue("scripts/s1e0{1:6}.csv") %>% 
+  map_dfr(read_csv)
+
+
+```
+
+
+
+
+### Data Warangling 
+
+```{r}
+parks_token <- parks %>% 
+  clean_names() %>% 
+  unnest_tokens(word, line) %>% 
+  anti_join(stop_words) %>% 
+  mutate(word = str_extract(word, "[a-z']+")) %>% 
+  drop_na(word)
+
+top_characters <- parks_token %>%
+  filter(character != "Extra") %>% 
+  count(character, sort = TRUE) %>%
+  slice_max(n, n = 10)
+
+parks_words <- parks_token %>% 
+  inner_join(top_characters) %>% 
+  filter(!word %in% c("hey", "yeah", "gonna")) %>% 
+  select(-n) %>% 
+  count(word, character, sort = TRUE) %>% 
+  ungroup() %>%
+  group_by(character) %>% 
+  top_n(10) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, n))
+  # mutate(word = factor(word)) %>% 
+  # mutate(word = fct_reorder(word, n)) %>% 
+  # mutate(word = fct_drop(word))
+
+ggplot(data = parks_words, 
+       aes(x = n, y = word, fill = character)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~character, scales = "free") 
+
+
+```
+
+
+```{r}
+swanson_words <- parks_token %>% 
+  filter(character == "Ron Swanson") %>% 
+  filter(!word %in% c("hey", "yeah", "gonna")) %>% 
+  count(word) %>% 
+  slice_max(n,n = 25)
+  
+swanson_pic <- jpeg::readJPEG(here("images","ron_swanson.jpg"))
+
+  # geom_text_wordcloud_area(
+  #   mask = png::readPNG(system.file("extdata/hearth.png",
+  #     package = "ggwordcloud", mustWork = TRUE
+  #   )),
+  #   rm_outside = TRUE
+  # ) 
+
+
+letter_p_pic <- png::readPNG(here("letter_p.png"))
+letter_p_pic <- jpeg::readJPEG(here("raster_ex.jpg"))
+
+swanson_cloud <- ggplot(data = swanson_words,
+                        aes(label = word)) +
+  background_image(swanson_pic) +
+  geom_text_wordcloud(aes(size = n), 
+                      color = "turquoise1",
+                      shape = "circle") +
+                      # show_boxes = FALSE,
+                      # grid_margin = 0.5,
+                      # grid_size = 0.5,
+                      # max_grid_size = 64) +
+  scale_size_area(max_size = 6) +
+  theme_void()
+
+swanson_cloud
+
+
+
+```
+
+
+```{r}
+
+knope_words <- parks_token %>% 
+  filter(character == "Leslie Knope") %>% 
+  filter(!word %in% c("hey", "yeah", "gonna")) %>% 
+  count(word) %>% 
+  slice_max(n,n = 25)
+  
+knope_pic <- jpeg::readJPEG(here("images", "knope.jpg"))
+
+knope_cloud <- ggplot(data = knope_words,
+                        aes(label = word)) +
+  background_image(knope_pic) +
+  geom_text_wordcloud(aes(size = n), 
+                      color = "turquoise1",
+                      shape = "star") +
+  scale_size_area(max_size = 6) +
+  theme_void()
+
+knope_cloud
+
+
+```
+
+```{r}
+
+april_words <- parks_token %>% 
+  filter(character == "April Ludgate") %>% 
+  filter(!word %in% c("hey", "yeah", "gonna")) %>% 
+  count(word) %>% 
+  slice_max(n,n = 25)
+  
+april_pic <- jpeg::readJPEG(here("images", "april.jpeg"))
+# april_pic <- png::readPNG(here("april.png"))
+
+april_cloud <- ggplot(data = april_words,
+                        aes(label = word)) +
+  background_image(april_pic) +
+  geom_text_wordcloud(aes(size = n), 
+                      color = "turquoise1",
+                      shape = "triangle-upright") +
+  scale_size_area(max_size = 6) +
+  theme_void()
+
+april_cloud
+
+
+```
+
+```{r}
+andy_words <- parks_token %>% 
+  filter(character == "Andy Dwyer") %>% 
+  filter(!word %in% c("hey", "yeah", "gonna")) %>% 
+  count(word) %>% 
+  slice_max(n,n = 25)
+  
+andy_pic <- jpeg::readJPEG(here("images", "andy.jpg"))
+
+andy_cloud <- ggplot(data = andy_words,
+                        aes(label = word)) +
+  background_image(andy_pic) +
+  geom_text_wordcloud(aes(size = n), 
+                      color = "turquoise1",
+                      shape = "diamond") +
+  scale_size_area(max_size = 6) +
+  theme_void()
+
+andy_cloud
+```
+
+
+```{r}
+
+patchwork <-  (andy_cloud + april_cloud) / (knope_cloud + swanson_cloud) 
+
+patchwork & theme(plot.background = element_rect(fill = "black",
+                                                 color = "black"),
+                  strip.background = element_rect(fill = "black",
+                                                 color = "black"))
+
+```
+
+
+### Visulization of counts
+
+### Sentiment Analysis
+
+
+
