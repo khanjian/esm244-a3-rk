@@ -1,0 +1,100 @@
+---
+title: "Spatial Data Visualization"
+subtitle: "ESM 244"
+author: "Roupen Khanjian"
+date: "Winter 2021"
+output: 
+  html_document:
+    theme: darkly
+    code_folding: hide
+    toc: TRUE 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse) # Easily Install and Load the 'Tidyverse', CRAN v1.3.0
+library(here) # A Simpler Way to Find Your Files, CRAN v1.0.1
+library(janitor) # Simple Tools for Examining and Cleaning Dirty Data, CRAN v2.1.0
+library(sf) # Simple Features for R, CRAN v0.9-7
+library(tmap) # Thematic Maps, CRAN v3.3
+library(gstat) # Spatial and Spatio-Temporal Geostatistical Modelling, Prediction and Simulation, CRAN v2.0-6
+library(stars) # Spatiotemporal Arrays, Raster and Vector Data Cubes, CRAN v0.5-1
+```
+
+## Data Wrangling {.tabset}
+
+```{r, results = 'hide'}
+# Read in the CA DFW Oil Spill Incident Tracking data
+ca_oil <- read_sf(here("ds394"), layer = "ds394") %>% 
+  clean_names()
+
+# Check the projection:
+st_crs(ca_oil) # EPSG = 3310
+
+
+# Read in the CA county data (TIGER shapefile):
+ca_counties <- read_sf(here("ca_counties"), layer = "CA_Counties_TIGER2016") %>% 
+  clean_names() %>% 
+  select(name)
+
+# Check the projection
+st_crs(ca_counties) # EPSG = 3857
+
+# Transform ca_counties into ca_oil
+
+ca_counties <- st_transform(ca_counties, st_crs(ca_oil))
+
+
+
+
+```
+
+
+
+```{r}
+
+```
+
+### Chloropleth
+
+```{r}
+
+# filter for inland only
+ca_oil <- ca_oil %>% 
+  filter(inlandmari == "Inland") 
+
+chlor_data <- ca_counties %>%
+  st_join(ca_oil) %>% 
+  count(localecoun)
+
+
+chlor_palette <- c("white", "lightblue" , "cadetblue", "skyblue", "steelblue", "dodgerblue", "royalblue", "blue", "navyblue")
+
+ggplot(data = chlor_data) +
+  geom_sf(aes(fill = n), color = "white", size = 0.1) +
+  # scale_fill_gradientn(colors = chlor_palette) +
+  scale_fill_gradient(low = "skyblue", high = "midnightblue") +
+  theme_void() +
+  labs(caption = "Chloropleth of counts of inland oil spills in 2008 in California",
+       fill = "Number of oil spills\nwithin county") +
+  theme(legend.title = element_text(face = "bold", size = 12, color = "white"),
+        legend.text = element_text(face = "bold", size = 10, color = "white"),
+        plot.caption = element_text(face = "bold", size = 10, color = "white"),
+        plot.background = element_rect(fill = "black"),
+        plot.margin = element_blank())
+  
+
+table(chlor_data$water)
+
+# ggplot() +
+  # geom_polygon(data = chlor_data, aes(x = longitude, y = latitude, 
+  #                                     fill = localecoun, group = localecoun)) +
+  # # geom_sf(data = chlor_data, aes(fill = name)) +
+  # theme_minimal() +
+  # coord_map()
+  
+  
+
+```
+
+
