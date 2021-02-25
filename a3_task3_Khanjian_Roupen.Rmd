@@ -56,6 +56,15 @@ parks_token <- parks %>%
   mutate(word = str_extract(word, "[a-z']+")) %>% 
   drop_na(word)
 
+test <- c("TEST", "Test", "test", "EVAN", "EvAn")
+
+test <- as.data.frame(test)
+
+df %>% 
+  mutate(character = str_extract(test,"[A-Z']+$")) %>% 
+  fill(character)
+
+
 top_characters <- parks_token %>%
   filter(character != "Extra") %>% 
   count(character, sort = TRUE) %>%

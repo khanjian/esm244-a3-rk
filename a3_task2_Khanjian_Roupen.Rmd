@@ -1,0 +1,118 @@
+---
+title: "Working with Raster Data"
+subtitle: "ESM 244"
+author: "Roupen Khanjian"
+date: "Winter 2021"
+output: 
+  html_document:
+    theme: flatly
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE)
+library(raster) # Geographic Data Analysis and Modeling, CRAN v3.4-5 (### NOTE: attaching this BEFORE tidyverse)
+library(tidyverse) # Easily Install and Load the 'Tidyverse', CRAN v1.3.0
+library(here) # A Simpler Way to Find Your Files, CRAN v1.0.1
+library(sf) # Simple Features for R, CRAN v0.9-7
+library(fasterize) # Fast Polygon to Raster Conversion, CRAN v1.0.3
+library(rnaturalearth) # World Map Data from Natural Earth, CRAN v0.1.0
+library(janitor) # Simple Tools for Examining and Cleaning Dirty Data, CRAN v2.1.0
+library(RColorBrewer) # ColorBrewer Palettes, CRAN v1.1-2
+library(ggrepel) # Automatically Position Non-Overlapping Text Labels with 'ggplot2', CRAN v0.9.1
+```
+
+### Data Wrangling
+
+```{r ,results=FALSE, cache=TRUE}
+# Get a list of all the raster file names
+raster_files <- list.files(here("ca_cetaceans"), 
+                           full.names = TRUE)
+
+# load raster as a stack
+ca_raster <-  raster::stack(raster_files) 
+
+# Define probability threshold
+pres_species <- function(x, thresh = .65) { 
+  y <- ifelse(x >= thresh, 1, 0)
+  return(y)
+}
+
+# Run threshold function on raster
+raster_thres <- calc(ca_raster, fun = pres_species)
+
+# Sum up species that are above the threshold at each location
+raster_sum <- calc(raster_thres, fun = sum)
+
+# Convert raster to data frame for plotting
+species_df <- raster::rasterToPoints(raster_sum) %>% 
+  as.data.frame()
+
+# land for plot
+land <-
+  ne_download(
+    type = 'countries',
+    returnclass = "sf"
+  )
+
+# ocean for plot
+ocean <-
+  ne_download(
+    type = 'ocean',
+    category = "physical",
+    returnclass = "sf"
+  )
+
+# coastline for plot
+coastline <- ne_coastline(returnclass = "sf")
+```
+
+### Finalized Static Map
+
+```{r, fig.cap= 'This plot shows the number of cetacean species present in locations off the coast of California. I chose to use a threshold of 0.65 as the cutoff if we include a particular species as being "present" or not. The darker red boxes are where there would the highest number of cetacean species in this map. In total 35 different cetacean species can be found in this area of the California coast.'}
+
+cities <- tibble(name = c("Los Angeles", "San Diego", 
+                          "Santa Barbara", "San Jose"),
+                 long = c(-118.24, -117.1, 
+                          -119.70, -121.89),
+                 lat = c(34.1, 32.73, 
+                         34.45, 37.45))
+
+ggplot() +
+  geom_sf(data = land,alpha = 0.9, fill = "forestgreen") + # land color
+  geom_sf(data = ocean,alpha = 0.9, fill = "steelblue2") + # ocean color
+  geom_raster(data = species_df, aes(x = x, y = y, fill = layer)) + # data
+  geom_sf(data = coastline, alpha = 0.9, size = 0.4) + # coastline border
+  geom_point(data = cities, aes(x = long, y = lat), 
+             size = 1.6, color = "black") + # some major cities
+  geom_text_repel(data = cities, aes(x = long, y = lat, label = name), 
+                  color = "white", nudge_x = 0.9, nudge_y = 0.15, 
+                  size = 4, min.segment.length = 1) + # City names
+  coord_sf(xlim = c(-125, -115),
+           ylim = c(32, 38)) +
+  scale_fill_gradient(low = "lightpink", high = "red4") +
+  labs(x = "Longitude",
+       y = "Latitude",
+       fill = "Species\nrichness",
+       title = "Species Richness of Cetacean Species") +
+  theme(axis.title = element_text(face = "bold", size = 12),
+        axis.text = element_text(face = "bold", size = 11),
+        legend.title = element_text(face = "bold", size = 12),
+        legend.text = element_text(face = "bold", size = 10),
+        plot.caption = element_text(size = 10),
+        plot.title = element_text(size = 15, face = "bold"),
+        panel.grid.major = element_line(color = "grey29",
+                                        linetype = "dashed"),
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(color = "black"))
+
+
+```
+
+
+
+
+
+
