@@ -1,5 +1,5 @@
 ---
-title: "Text Wrangling"
+title: "Parks and Recreation Text Analysis"
 subtitle: "ESM 244"
 author: "Roupen Khanjian"
 date: "Winter 2021"
@@ -12,132 +12,120 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
-library(tidyverse)
-library(tidytext)
-library(textdata)
-library(ggwordcloud)
-library(glue)
-library(here)
-library(janitor)
-library(tvthemes)
-library(ggimage)
-library(ggpubr)
-library(patchwork)
+library(plotly) # Create Interactive Web Graphics via 'plotly.js', CRAN v4.9.3
+library(tidyverse) # Easily Install and Load the 'Tidyverse', CRAN v1.3.0
+library(tidytext) # Text Mining using 'dplyr', 'ggplot2', and Other Tidy Tools, CRAN v0.3.0
+library(textdata) # Download and Load Various Text Datasets, CRAN v0.4.1
+library(ggwordcloud) # A Word Cloud Geom for 'ggplot2', CRAN v0.5.0
+library(glue) # Interpreted String Literals, CRAN v1.4.2
+library(here) # A Simpler Way to Find Your Files, CRAN v1.0.1
+library(janitor) # Simple Tools for Examining and Cleaning Dirty Data, CRAN v2.1.0
+library(tvthemes) # TV Show Themes and Color Palettes for 'ggplot2' Graphics, CRAN v1.1.1
+library(ggimage) # Use Image in 'ggplot2', CRAN v0.2.8
+library(ggpubr) # 'ggplot2' Based Publication Ready Plots, CRAN v0.4.0
+library(patchwork) # The Composer of Plots, CRAN v1.1.1
+library(kableExtra) # Construct Complex Table with 'kable' and Pipe Syntax, CRAN v1.3.2
+library(knitr) # A General-Purpose Package for Dynamic Report Generation in R, CRAN v1.31
+library(slider) # Sliding Window Functions, CRAN v0.1.5
 
 ```
 
-## Data Introduction {.tabset}
+## Data Introduction
+
+Parks and recreation was a television comedy show that aired on NBC from 2009 until 2015. I obtained the complete transcripts and performed text analysis on the dialogue of the show. [Link to data](https://www.kaggle.com/heheheluke/parks-and-recreation-scripts?select=scripts).
 
 ```{r}
 
-# source = https://www.kaggle.com/heheheluke/parks-and-recreation-scripts?select=scripts
-
-file_names <- list.files(here("scripts"))
+file_names <- list.files(here("scripts")) # file names for each episode
 
 parks <- str_glue("scripts/{file_names}") %>% 
-  map_dfr(read_csv)
+  map_dfr(read_csv) # read in all the episodes into one data frame!
 
-season_1 <- str_glue("scripts/s1e0{1:6}.csv") %>% 
-  map_dfr(read_csv)
-
-
-```
-
-
-
-
-### Data Warangling 
-
-```{r}
+# Tokenize lines to one word in each row
 parks_token <- parks %>% 
   clean_names() %>% 
-  unnest_tokens(word, line) %>% 
-  anti_join(stop_words) %>% 
-  mutate(word = str_extract(word, "[a-z']+")) %>% 
-  drop_na(word)
+  unnest_tokens(word, line) %>% # tokenize
+  anti_join(stop_words) %>% # remove stop words
+  mutate(word = str_extract(word, "[a-z']+")) %>% # extract words only
+  drop_na(word) # take out missing values
 
-test <- c("TEST", "Test", "test", "EVAN", "EvAn")
-
-test <- as.data.frame(test)
-
-df %>% 
-  mutate(character = str_extract(test,"[A-Z']+$")) %>% 
-  fill(character)
-
-
+# Filter the top 10 characters with the most words
 top_characters <- parks_token %>%
-  filter(character != "Extra") %>% 
+  dplyr::filter(character != "Extra") %>% 
   count(character, sort = TRUE) %>%
-  slice_max(n, n = 10)
+  slice_max(n, n = 10) 
 
+# Obtain words only from the top 10 characters
 parks_words <- parks_token %>% 
   inner_join(top_characters) %>% 
   filter(!word %in% c("hey", "yeah", "gonna")) %>% 
   select(-n) %>% 
   count(word, character, sort = TRUE) %>% 
-  ungroup() %>%
+  ungroup() %>% 
   group_by(character) %>% 
-  top_n(10) %>%
-  ungroup() %>%
-  mutate(word = reorder(word, n))
-  # mutate(word = factor(word)) %>% 
-  # mutate(word = fct_reorder(word, n)) %>% 
-  # mutate(word = fct_drop(word))
+  top_n(9) # top 9
 
-ggplot(data = parks_words, 
-       aes(x = n, y = word, fill = character)) +
-  geom_col(show.legend = FALSE) +
-  facet_wrap(~character, scales = "free") 
-
+# Sample of a few lines from the show
+parks %>% 
+  slice(sample(1:65942, 20)) %>% 
+  kbl(caption = "<b style = 'color:white;'>
+      Sample of a few randomly chosen lines from Parks and Recreation") %>%
+  kable_material_dark(bootstrap_options = c("striped", "hover")) %>%
+  scroll_box(width = "100%", height = "300px", 
+             fixed_thead = list(enabled = T, background = "#222222"))
 
 ```
 
+## Word Count of Major Characters
 
 ```{r}
+ggplot(data = parks_words, 
+       aes(x = n, y = word, fill = n)) +
+  geom_col(show.legend = FALSE) +
+  scale_fill_viridis_c(option = "plasma") +
+  facet_wrap(~character, scales = "free") +
+  theme_brooklyn99() +
+  theme(panel.grid.major.y = element_blank(),
+        axis.text.x = element_text(size = 9),
+        axis.text.y = element_text(size = 10),
+        axis.title = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.text = element_text(color = "white",
+                                  face = "bold",
+                                  size = 10.5))
+
+```
+
+## Wordcloud
+
+* Below is a wordcloud of the 25 most frequently used words by the following characters starting from the upper left hand corner going clockwise: Andy Dwyer, April Ludgate, Ron Swanson, and Lesli Knope.
+
+```{r, cache=TRUE}
+
+# Ron Swanson
+
 swanson_words <- parks_token %>% 
-  filter(character == "Ron Swanson") %>% 
-  filter(!word %in% c("hey", "yeah", "gonna")) %>% 
+  filter(character == "Ron Swanson") %>% # filter for character
+  filter(!word %in% c("hey", "yeah", "gonna")) %>% # remove some more stopwords
   count(word) %>% 
-  slice_max(n,n = 25)
+  slice_max(n,n = 25) # choose top 25 words
   
-swanson_pic <- jpeg::readJPEG(here("images","ron_swanson.jpg"))
-
-  # geom_text_wordcloud_area(
-  #   mask = png::readPNG(system.file("extdata/hearth.png",
-  #     package = "ggwordcloud", mustWork = TRUE
-  #   )),
-  #   rm_outside = TRUE
-  # ) 
-
-
-letter_p_pic <- png::readPNG(here("letter_p.png"))
-letter_p_pic <- jpeg::readJPEG(here("raster_ex.jpg"))
+swanson_pic <- jpeg::readJPEG(here("images","ron_swanson.jpg")) 
 
 swanson_cloud <- ggplot(data = swanson_words,
                         aes(label = word)) +
-  background_image(swanson_pic) +
+  background_image(swanson_pic) + # add image of character
   geom_text_wordcloud(aes(size = n), 
                       color = "turquoise1",
                       shape = "circle") +
-                      # show_boxes = FALSE,
-                      # grid_margin = 0.5,
-                      # grid_size = 0.5,
-                      # max_grid_size = 64) +
   scale_size_area(max_size = 6) +
   theme_void()
 
-swanson_cloud
-
-
-
-```
-
-
-```{r}
+# Lesile Knope
 
 knope_words <- parks_token %>% 
   filter(character == "Leslie Knope") %>% 
-  filter(!word %in% c("hey", "yeah", "gonna")) %>% 
+  filter(!word %in% c("hey", "yeah", "gonna")) %>% # remove some more stopwords
   count(word) %>% 
   slice_max(n,n = 25)
   
@@ -152,21 +140,15 @@ knope_cloud <- ggplot(data = knope_words,
   scale_size_area(max_size = 6) +
   theme_void()
 
-knope_cloud
-
-
-```
-
-```{r}
+# April Ludgate
 
 april_words <- parks_token %>% 
   filter(character == "April Ludgate") %>% 
-  filter(!word %in% c("hey", "yeah", "gonna")) %>% 
+  filter(!word %in% c("hey", "yeah", "gonna")) %>% # remove some more stopwords
   count(word) %>% 
   slice_max(n,n = 25)
   
 april_pic <- jpeg::readJPEG(here("images", "april.jpeg"))
-# april_pic <- png::readPNG(here("april.png"))
 
 april_cloud <- ggplot(data = april_words,
                         aes(label = word)) +
@@ -177,15 +159,11 @@ april_cloud <- ggplot(data = april_words,
   scale_size_area(max_size = 6) +
   theme_void()
 
-april_cloud
+# Andy Dwyer
 
-
-```
-
-```{r}
 andy_words <- parks_token %>% 
   filter(character == "Andy Dwyer") %>% 
-  filter(!word %in% c("hey", "yeah", "gonna")) %>% 
+  filter(!word %in% c("hey", "yeah", "gonna")) %>% # remove some more stopwords
   count(word) %>% 
   slice_max(n,n = 25)
   
@@ -200,25 +178,182 @@ andy_cloud <- ggplot(data = andy_words,
   scale_size_area(max_size = 6) +
   theme_void()
 
-andy_cloud
+# Final patcwork wordcloud
+
+patchwork <-  (andy_cloud + april_cloud) / (knope_cloud + swanson_cloud) 
+
+patchwork & theme(plot.background = element_rect(fill = "#222222",
+                                                 color = "#222222"),
+                  strip.background = element_rect(fill = "#222222",
+                                                 color = "#222222"))
+
 ```
+
+
+## Sentiment Analysis throughout entire show
 
 
 ```{r}
 
-patchwork <-  (andy_cloud + april_cloud) / (knope_cloud + swanson_cloud) 
+parks <- str_glue("scripts/{file_names}") %>% 
+  map_dfr(read_csv) # read in all the episodes into one data frame!
 
-patchwork & theme(plot.background = element_rect(fill = "black",
-                                                 color = "black"),
-                  strip.background = element_rect(fill = "black",
-                                                 color = "black"))
+file_names_season <- str_sub(file_names, start = 3L)
+
+# which(file_names_season == "e01.csv")
+
+# season_1 <- str_glue("scripts/{file_names[1:6]}") %>% 
+#   map_dfr(read_csv)
+# 
+# season_2 <- str_glue("scripts/{file_names[7:30]}") %>% 
+#   map_dfr(read_csv)
+# 
+# season_3 <- str_glue("scripts/{file_names[31:46]}") %>% 
+#   map_dfr(read_csv)
+
+season_4 <- str_glue("scripts/{file_names[47:68]}") %>% 
+  map_dfr(read_csv)
+
+# season_5 <- str_glue("scripts/{file_names[69:90]}") %>% 
+#   map_dfr(read_csv)
+# 
+# season_6 <- str_glue("scripts/{file_names[91:110]}") %>% 
+#   map_dfr(read_csv)
+# 
+# season_7 <- str_glue("scripts/{file_names[111:length(file_names)]}") %>% 
+#   map_dfr(read_csv)
+
+
+
+parks_afinn <- parks_token %>% 
+  inner_join(get_sentiments("afinn")) %>%
+  drop_na(value) %>% 
+  mutate(index = seq(1, length(word) ,1)) %>% 
+  mutate(moving_avg = as.numeric(slide(value,
+                                       mean, 
+                                       .before = (151 - 1)/2 , 
+                                       .after = (151 - 1)/2 ))) %>% 
+  mutate(neg_pos = factor(case_when(
+    moving_avg > 0 ~ "Positive",
+    moving_avg <= 0 ~ "Negative"
+  )))
+
+sent_plot <- ggplot(data = parks_afinn, aes(x = index, y = moving_avg)) +
+  geom_col(aes(fill = neg_pos)) +
+  scale_fill_manual(values = c("Positive" = "springgreen2",
+                               "Negative" = "darkred"))+
+  theme_minimal() +
+  labs(x = "Index",
+       y = "Moving Average AFINN sentiment",
+       fill = "") +
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 11,
+                                   face = "bold",
+                                   color = "white"),
+        axis.title.y = element_text(color = "white",
+                                  size = 12,
+                                  face = "bold"),
+        axis.title.x = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.background = element_rect(fill = "#222222", 
+                                       color = "#222222"),
+        strip.background = element_rect(fill = "#222222", 
+                                        color = "#222222"),
+        legend.text = element_text(color = "white",
+                                  size = 11,
+                                  face = "bold"))
+
+# Make it interactive:
+# ggplotly(sent_plot, tooltip = c("index", "character", "word", "value"))
+
+sent_plot
 
 ```
 
+## Sentiment Anaylsis of Season 4 (The best season)
 
-### Visulization of counts
+```{r}
 
-### Sentiment Analysis
+# Tokenize lines to one word in each row
+season_token <-  season_4 %>% 
+  clean_names() %>% 
+  unnest_tokens(word, line) %>% # tokenize
+  anti_join(stop_words) %>% # remove stop words
+  mutate(word = str_extract(word, "[a-z']+")) %>% # extract words only
+  drop_na(word) # take out missing values
 
+season_afinn <- season_token %>% 
+  inner_join(get_sentiments("afinn")) %>%
+  drop_na(value) %>% 
+  mutate(index = seq(1, length(word) ,1)) %>% 
+  mutate(moving_avg = as.numeric(slide(value,
+                                       mean, 
+                                       .before = (51 - 1)/2 , 
+                                       .after = (51 - 1)/2 ))) 
+
+season_plot <- ggplot(data = season_afinn, aes(x = index, y = moving_avg)) +
+  geom_col(aes(fill = moving_avg)) +
+  scale_fill_distiller(type = "div",
+                       palette = "BrBG")+
+  theme_minimal() +
+  labs(x = "Index",
+       y = "Moving Average AFINN sentiment",
+       fill = "") +
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 11,
+                                   face = "bold",
+                                   color = "white"),
+        axis.title.y = element_text(color = "white",
+                                  size = 12,
+                                  face = "bold"),
+        axis.title.x = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.background = element_rect(fill = "#222222", 
+                                       color = "#222222"),
+        strip.background = element_rect(fill = "#222222", 
+                                        color = "#222222"),
+        legend.text = element_text(color = "white",
+                                  size = 11,
+                                  face = "bold"))
+
+# Make it interactive:
+# ggplotly(sent_plot, tooltip = c("index", "character", "word", "value"))
+
+season_plot
+
+```
+
+## Sentiment Analysis for all the character 
+
+```{r}
+
+characters_sent <-  parks_token %>%
+  inner_join(top_characters) %>%
+  filter(!word %in% c("hey", "yeah", "gonna")) %>%
+  select(-n) %>% 
+  inner_join(get_sentiments("nrc")) %>% 
+  count(sentiment, character, sort = TRUE)
+
+ggplot(data = characters_sent, 
+       aes(x = n, y = sentiment, fill = n)) +
+  geom_col(show.legend = FALSE) +
+  scale_fill_viridis_c(option = "plasma") +
+  facet_wrap(~character, scales = "free") +
+  theme_brooklyn99() +
+  theme(panel.grid.major.y = element_blank(),
+        axis.text.x = element_text(size = 8),
+        axis.text.y = element_text(size = 9.5),
+        axis.title = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.text = element_text(color = "white",
+                                  face = "bold",
+                                  size = 10))
+
+
+```
 
 
