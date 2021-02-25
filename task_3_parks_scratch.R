@@ -55,3 +55,25 @@ top_characters <- parks_token %>%
   separate(character, c("first", "last"), remove = FALSE) %>% 
   mutate(first = str_to_lower(first)) %>% 
   mutate(last = str_to_lower(last))
+
+
+
+# season_1 <- str_glue("scripts/{file_names[1:6]}") %>% 
+#   map_dfr(read_csv)
+# 
+# season_2 <- str_glue("scripts/{file_names[7:30]}") %>% 
+#   map_dfr(read_csv)
+# 
+# season_3 <- str_glue("scripts/{file_names[31:46]}") %>% 
+#   map_dfr(read_csv)
+
+
+
+# season_5 <- str_glue("scripts/{file_names[69:90]}") %>% 
+#   map_dfr(read_csv)
+# 
+# season_6 <- str_glue("scripts/{file_names[91:110]}") %>% 
+#   map_dfr(read_csv)
+# 
+# season_7 <- str_glue("scripts/{file_names[111:length(file_names)]}") %>% 
+#   map_dfr(read_csv)

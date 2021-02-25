@@ -7,7 +7,8 @@ output:
   html_document:
     theme: darkly
     code_folding: hide
-    toc: TRUE 
+    toc: true
+    toc_float: true
 ---
 
 ```{r setup, include=FALSE}
@@ -27,12 +28,15 @@ library(patchwork) # The Composer of Plots, CRAN v1.1.1
 library(kableExtra) # Construct Complex Table with 'kable' and Pipe Syntax, CRAN v1.3.2
 library(knitr) # A General-Purpose Package for Dynamic Report Generation in R, CRAN v1.31
 library(slider) # Sliding Window Functions, CRAN v0.1.5
+library(rcartocolor) # 'CARTOColors' Palettes, CRAN v2.0.0
 
 ```
 
 ## Data Introduction
 
-Parks and recreation was a television comedy show that aired on NBC from 2009 until 2015. I obtained the complete transcripts and performed text analysis on the dialogue of the show. [Link to data](https://www.kaggle.com/heheheluke/parks-and-recreation-scripts?select=scripts).
+Parks and recreation was a television comedy show that aired on NBC from 2009 until 2015. I obtained the complete transcripts and performed text analysis on the dialogue of the show.   
+
+**Citation for dataset**: He, Luke. (2019, November 23) *Park and Recreation Scripts*. [Link to data](https://www.kaggle.com/heheheluke/parks-and-recreation-scripts?select=scripts).
 
 ```{r}
 
@@ -69,14 +73,17 @@ parks_words <- parks_token %>%
 parks %>% 
   slice(sample(1:65942, 20)) %>% 
   kbl(caption = "<b style = 'color:white;'>
-      Sample of a few randomly chosen lines from Parks and Recreation") %>%
+       Sample of a few randomly chosen lines from Parks and Recreation.") %>%
   kable_material_dark(bootstrap_options = c("striped", "hover")) %>%
+  row_spec(0, color = "white", background = "#222222") %>%
   scroll_box(width = "100%", height = "300px", 
              fixed_thead = list(enabled = T, background = "#222222"))
 
 ```
 
 ## Word Count of Major Characters
+
+It's difficult to choose a favorite character from Parks and Rec, thus I plotted the top 9 most frequently used words from ten characters. Some examples of words that would resonate with fans of the show are Chris Traeger's *literally*, Jerry (Gary) Gergich's *geez*,  or Ben Wyatt's *uh*. 
 
 ```{r}
 ggplot(data = parks_words, 
@@ -87,7 +94,7 @@ ggplot(data = parks_words,
   theme_brooklyn99() +
   theme(panel.grid.major.y = element_blank(),
         axis.text.x = element_text(size = 9),
-        axis.text.y = element_text(size = 10),
+        axis.text.y = element_text(size = 9.5),
         axis.title = element_blank(),
         panel.grid.minor = element_blank(),
         strip.text = element_text(color = "white",
@@ -98,8 +105,8 @@ ggplot(data = parks_words,
 
 ## Wordcloud
 
-* Below is a wordcloud of the 25 most frequently used words by the following characters starting from the upper left hand corner going clockwise: Andy Dwyer, April Ludgate, Ron Swanson, and Lesli Knope.
-
+Below are four wordclouds of the 25 most frequently used words by the following characters starting from the upper left hand corner going clockwise: Andy Dwyer, April Ludgate, Ron Swanson, and Leslie Knope. We can see Andy Dwyer's enthusiasm with *karate* and *band*, Leslie Knope's love for *pawnee*, *city*, and *parks*, but also Ron Swanson's contempt for *government* and his 2 ex-wives both named *tammy*.
+ 
 ```{r, cache=TRUE}
 
 # Ron Swanson
@@ -189,47 +196,53 @@ patchwork & theme(plot.background = element_rect(fill = "#222222",
 
 ```
 
+## Character Sentimemnt Analysis
 
-## Sentiment Analysis throughout entire show
+Using the nrc lexicon, which bins 13,901 words into 8 emotions, along with giving them a positive or negative rating, I plotted the counts of each sentiment for ten characters. We see that all the characters shown here use more positive words, and they all used words associated with *trust* and *anticipation*.    
 
+**Citation for NRC lexicon**: Crowdsourcing a Word-Emotion Association Lexicon, Saif Mohammad and Peter Turney, Computational Intelligence, 29 (3), 436-465, 2013. [nrc lexicon](https://saifmohammad.com/WebPages/NRC-Emotion-Lexicon.htm)
 
 ```{r}
 
-parks <- str_glue("scripts/{file_names}") %>% 
-  map_dfr(read_csv) # read in all the episodes into one data frame!
+characters_sent <-  parks_token %>%
+  inner_join(top_characters) %>%
+  filter(!word %in% c("hey", "yeah", "gonna")) %>%
+  select(-n) %>% 
+  inner_join(get_sentiments("nrc")) %>% 
+  count(sentiment, character, sort = TRUE)
 
-file_names_season <- str_sub(file_names, start = 3L)
-
-# which(file_names_season == "e01.csv")
-
-# season_1 <- str_glue("scripts/{file_names[1:6]}") %>% 
-#   map_dfr(read_csv)
-# 
-# season_2 <- str_glue("scripts/{file_names[7:30]}") %>% 
-#   map_dfr(read_csv)
-# 
-# season_3 <- str_glue("scripts/{file_names[31:46]}") %>% 
-#   map_dfr(read_csv)
-
-season_4 <- str_glue("scripts/{file_names[47:68]}") %>% 
-  map_dfr(read_csv)
-
-# season_5 <- str_glue("scripts/{file_names[69:90]}") %>% 
-#   map_dfr(read_csv)
-# 
-# season_6 <- str_glue("scripts/{file_names[91:110]}") %>% 
-#   map_dfr(read_csv)
-# 
-# season_7 <- str_glue("scripts/{file_names[111:length(file_names)]}") %>% 
-#   map_dfr(read_csv)
+ggplot(data = characters_sent, 
+       aes(x = n, y = sentiment, fill = n)) +
+  geom_col(show.legend = FALSE) +
+  scale_fill_viridis_c(option = "plasma") +
+  facet_wrap(~character, scales = "free") +
+  theme_brooklyn99() +
+  theme(panel.grid.major.y = element_blank(),
+        axis.text.x = element_text(size = 7.5),
+        axis.text.y = element_text(size = 9.5),
+        axis.title = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.text = element_text(color = "white",
+                                  face = "bold",
+                                  size = 9.3))
 
 
+```
+
+
+## Trajectory of Sentiment 
+
+Parks and Recreation is a hilarious comedy show with many enjoyable characters. Thus, it's no surprise that for most of the show the average sentiment is more positive. Using the AFINN lexicon, which assigns words a score between -5 (negative sentiment) and 5 (positive sentiment), I obtained the moving average with a window size of 151, and plotted the moving average sentiment throughout the entirety of the show.
+
+**Citation for AFINN lexicon**: AFINN, Nielson, Finn Årup. Informatics and Mathematical Modelling, Technical University of Denmark. March 2011. [AFINN lexicon](https://www2.imm.dtu.dk/pubdb/pubs/6010-full.html)
+
+```{r}
 
 parks_afinn <- parks_token %>% 
   inner_join(get_sentiments("afinn")) %>%
   drop_na(value) %>% 
-  mutate(index = seq(1, length(word) ,1)) %>% 
-  mutate(moving_avg = as.numeric(slide(value,
+  mutate(index = seq(1, length(word) ,1)) %>% # make an index
+  mutate(moving_avg = as.numeric(slide(value, # get moving average
                                        mean, 
                                        .before = (151 - 1)/2 , 
                                        .after = (151 - 1)/2 ))) %>% 
@@ -244,7 +257,7 @@ sent_plot <- ggplot(data = parks_afinn, aes(x = index, y = moving_avg)) +
                                "Negative" = "darkred"))+
   theme_minimal() +
   labs(x = "Index",
-       y = "Moving Average AFINN sentiment",
+       y = "Moving Average AFINN Sentiment",
        fill = "") +
   theme(panel.grid.minor.y = element_blank(),
         panel.grid.major.x = element_blank(),
@@ -265,16 +278,23 @@ sent_plot <- ggplot(data = parks_afinn, aes(x = index, y = moving_avg)) +
                                   size = 11,
                                   face = "bold"))
 
-# Make it interactive:
-# ggplotly(sent_plot, tooltip = c("index", "character", "word", "value"))
-
 sent_plot
 
 ```
 
-## Sentiment Anaylsis of Season 4 (The best season)
+## Sentiment Anaylsis of Season 4
+
+I decided to take a closer look at the sentiment throughout season 4 since this was one of the more popular seasons, where Leslie Knope is campaigning to be a member of the city council of Pawnee, Indiana. Here I used a moving average window of 51 to plot the AFINN sentiment value. We see that for most of the season the overall average sentiment is positive, except for a noticeable drop near the end of the season where the sentiment score falls around -1.
 
 ```{r}
+
+file_names_season <- str_sub(file_names, start = 3L)
+
+# used this line of code to easily find the episode number of each season
+# which(file_names_season == "e01.csv")
+
+season_4 <- str_glue("scripts/{file_names[47:68]}") %>% 
+  map_dfr(read_csv)
 
 # Tokenize lines to one word in each row
 season_token <-  season_4 %>% 
@@ -293,13 +313,16 @@ season_afinn <- season_token %>%
                                        .before = (51 - 1)/2 , 
                                        .after = (51 - 1)/2 ))) 
 
+
 season_plot <- ggplot(data = season_afinn, aes(x = index, y = moving_avg)) +
   geom_col(aes(fill = moving_avg)) +
-  scale_fill_distiller(type = "div",
-                       palette = "BrBG")+
+  # scale_fill_distiller(type = "div",
+  #                      palette = "GnPR")+
+  scale_fill_carto_c(type = "diverging",
+                     palette = "Earth") +
   theme_minimal() +
   labs(x = "Index",
-       y = "Moving Average AFINN sentiment",
+       y = "Moving Average AFINN Sentiment",
        fill = "") +
   theme(panel.grid.minor.y = element_blank(),
         panel.grid.major.x = element_blank(),
@@ -320,39 +343,31 @@ season_plot <- ggplot(data = season_afinn, aes(x = index, y = moving_avg)) +
                                   size = 11,
                                   face = "bold"))
 
-# Make it interactive:
-# ggplotly(sent_plot, tooltip = c("index", "character", "word", "value"))
-
 season_plot
-
 ```
 
-## Sentiment Analysis for all the character 
+Digging into the data I found that this occurred during the penultimate episode of the season named "Bus Tour". The episode starts with Lesile Knope behind in polls to her opponent in the city council race, Bobby Newport. During one of her campaign stops, in response to a question by a reporter, Lesile starts saying disparaging things about Bobby's father. After she is finished, the reporter informs Leslie her question was about if she had any comments about his death earlier in the day. Meanwhile, in order to get people to the polls, Lesile's team trys to secure vans to transport possible voters. But Bobby Newport's team has secured all the vans in the city. Thus, most of the episode is spent trying to do damage control for Lesile and her campaign team's mishaps. Below are the words that have AFINN ratings during this dip in sentiment in season 4. 
 
 ```{r}
+# Investigate the negative dip of the plot
+season_afinn_neg <- season_afinn %>% 
+  filter(moving_avg < -0.75) %>% 
+  slice(-c(1:2)) %>% 
+  select(-index) %>% 
+  rename('moving average' = moving_avg)
 
-characters_sent <-  parks_token %>%
-  inner_join(top_characters) %>%
-  filter(!word %in% c("hey", "yeah", "gonna")) %>%
-  select(-n) %>% 
-  inner_join(get_sentiments("nrc")) %>% 
-  count(sentiment, character, sort = TRUE)
+# How I figured out which episode it was
+season_4_subset <- season_4 %>% 
+  filter(Character == "Bill") 
 
-ggplot(data = characters_sent, 
-       aes(x = n, y = sentiment, fill = n)) +
-  geom_col(show.legend = FALSE) +
-  scale_fill_viridis_c(option = "plasma") +
-  facet_wrap(~character, scales = "free") +
-  theme_brooklyn99() +
-  theme(panel.grid.major.y = element_blank(),
-        axis.text.x = element_text(size = 8),
-        axis.text.y = element_text(size = 9.5),
-        axis.title = element_blank(),
-        panel.grid.minor = element_blank(),
-        strip.text = element_text(color = "white",
-                                  face = "bold",
-                                  size = 10))
-
+# Table of words
+season_afinn_neg %>% 
+  kbl(caption = "<b style = 'color:white;'>
+       What was happening towards the end of season 4 of Park and Recreation when things went south?") %>%
+  kable_material_dark(bootstrap_options = c("striped", "hover")) %>%
+  row_spec(0, color = "white", background = "#222222") %>%
+  scroll_box(width = "100%", height = "300px", 
+             fixed_thead = list(enabled = T, background = "#222222"))
 
 ```
 
